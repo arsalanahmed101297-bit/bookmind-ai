@@ -1,0 +1,94 @@
+# 23.8 Permission policies: allow, ask, decide (/building-ai-workers/hosted-agents/permission-policies)
+
+---
+type: Document
+title: "23.8 Permission policies: allow, ask, decide"
+description: "Allow, ask and decide for each tool, the defaults for connector and built-in tools, and why only ask puts a person behind the call."
+status: stable
+order: 323.08
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-21T00:02:26Z
+chapter: "23"
+part: III
+expert_status: builder-only
+concepts: [ "23.8" ]
+last_verified: 2026-11-05
+sources:
+  - id: openai-agents-js-hitl
+    title: "Human in the loop, Agents SDK for TypeScript (OpenAI, accessed 2026-11-06)"
+    resource: https://openai.github.io/openai-agents-js/guides/human-in-the-loop/
+generated:
+  at: 2026-11-21T00:02:26Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** A hospital pharmacy sorts its medicines into three cabinets. Some are on an open shelf: any nurse may take them. Some need a pharmacist's signature each time. And some sit behind a machine that checks the prescription against the patient's chart and dispenses or refuses. The machine is useful, but no hospital calls it a pharmacist. In this concept, the open shelf is "allow", the signature is "ask", and the machine is "decide".
+
+**What you will learn.** The three rules a tool can have on a hosted worker, what each one does on every call, and which defaults protect you and which do not.
+
+**Why it matters.** A tool added to a server next month should not run in your product until someone reviews it. And a platform's own judgment cannot stand in for the person who must answer for an action.
+
+**One request, start to finish.** Next month, Brightline's connector gains a fifth tool, `export_vendor_list`, added for another team. Ana asks the worker a question the new tool could help with.
+
+1. **The four reviewed tools run without asking.** Their policy is "allow".
+2. **The new tool is not on the list of tools turned on** ([23.6](what-travels.md)), so the model never sees it. Ana gets her answer from the four.
+
+### What if someone had turned the whole connector on instead?
+
+1. **The new tool's policy is "ask",** the default for every connector tool. The session stops with "needs action" and names the call.
+2. **The portal shows Ana** the tool's name and its inputs, with Allow and Deny buttons.
+3. **Ana denies it.** The session continues without it, and tells her it could not export the list.
+
+### What is a permission policy?
+
+A **permission policy** is the rule for one tool, set in the agent definition. There are three:
+
+| Policy | What happens on each call | Use it for |
+| --- | --- | --- |
+| Allow | The tool runs. Nobody is asked | Tools you have reviewed, that cannot do harm in this worker |
+| Ask | The session stops and waits for your product to allow or deny that one call | Anything new, unreviewed, or with an effect a person must own |
+| Decide | The platform judges each call, and runs it, refuses it, or stops to ask | Never as a stand-in for a person |
+
+The defaults are where most mistakes hide. On the lab's main platform, connector tools default to ask, so a tool someone adds to a server later does not run in your product without approval. That default protects you. The worker's own built-in tools, such as running commands or reading files, default to allow. That default does not. A command tool left on, with "allow", runs any command a fooled model asks for, inside the sandbox, without asking. So the lab turns off every built-in tool it does not need, and keeps only the file tools the skill reads with.
+
+### Have you seen these shapes before (22.5)?
+
+In [Chapter 22](../agent-sdks/who-may-run-a-tool.md), the first SDK asked your callback, which answered at once, and the second SDK paused the run and handed the call back for approval.[^openai-agents-js-hitl] A hosted platform runs no code of yours inside its loop, so "ask" works like the second SDK's approval: the session stops, your product sees the call as an event, and answers it. "Decide" is like the setting Chapter 22 warned an SDK may choose for you if you leave it out, where a second model judges each call. It can be useful, but it is never your rule and never a person.
+
+### How does the confirmation round trip work?
+
+With "ask", the session emits the tool call, then goes idle with the stop reason "needs action", naming the call ([23.3](reading-a-session.md)). It waits with no time limit. Your product shows the person the call, then sends back a **confirmation**: allow or deny, for that one call, with an optional message saying why. A deny reaches the model as a refused tool result, and it carries on without it.
+
+### Is a platform's judgment a human checkpoint?
+
+"Decide" can be useful for low-risk tools in a worker no one watches. But understand what it judges. It reads the question your product sends as what the person wants, even if an untrusted user typed it. It treats what tools return, pages it fetched and connector results as data, never as intent. So it can refuse an instruction hidden in a vendor note. It cannot know that the person asking has no right to the answer, and it cannot be the person who is accountable for an action. When an action needs someone accountable, use "ask", and put a person behind it (Chapter 28).
+
+### How do you see what was decided?
+
+Each tool call in the log carries the policy's result for that call: allowed, asked or refused. Under "decide", a call it refused or paused also carries the platform's reason, as a code. That makes the log the record of who allowed what.
+
+**At work.** In [Lab 23](lab.md), Task 6, Claude Code sets the connector's default policy to "ask", turns on the four read-only connector tools by name with "allow", and keeps the command tool and both web tools off. Three built-in file tools stay on: read (open a file in the sandbox), glob (list files whose names match a pattern) and grep (search inside files). The builder asks: "Show me, for each tool the model can see, its policy and why." Claude Code prints seven rows. Four are connector tools on "allow", reviewed in [Chapter 17](../connectors-and-mcp/overview.md). Three are file tools (read, glob and grep) on "allow", which the skill needs and which reach only the sandbox's own files. The lab never uses "decide", because no person checks it.
+
+**The operating rule:** ask by default, and allow only the tools you reviewed. Never let the platform's judgment stand in for a person who must own the action.
+
+![Three columns side by side. Each starts with a box labeled one tool call, with an arrow down to a second box. Left, edged in green: allow, the tool runs, nobody is asked, reviewed tools. Middle, edged in gold, ask: the session waits for a person to choose Allow or Deny, anything new, waits with no time limit. Right, edged in red-orange, decide: the platform judges each call, not a person, and cannot know who has the right to ask. Below: defaults, connector tools ask, which protects you. Built-in tools allow, which does not. Then: turn off what the worker does not need.](img/chapter-22-three-policies.png)
+
+*Figure 23.12. Allow, ask, decide. Only "ask" puts a person behind the call.*
+
+### Part B in one minute
+
+Your skills and connector travel unchanged, but commands, hooks and settings files do not, so their checks move into a policy or the connector (23.6). The sandbox gets one open door, the connector's address ([23.7](the-sandbox-and-its-network.md)). And every tool gets a policy: allow, ask a person, or let the platform decide, which is never a human checkpoint (23.8).
+
+**Now do Lab 23, Sitting 2** on the lab page: Tasks 5 to 8 (about 1 hour 15 minutes). Then come back for Part C.
+
+[^openai-agents-js-hitl]: Human in the loop, Agents SDK for TypeScript, OpenAI.
+
+

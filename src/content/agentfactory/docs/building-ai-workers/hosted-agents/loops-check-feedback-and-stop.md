@@ -1,0 +1,113 @@
+# 23.16 Loops: check, feedback and stop (/building-ai-workers/hosted-agents/loops-check-feedback-and-stop)
+
+---
+type: Document
+title: "23.16 Loops: check, feedback and stop"
+description: "An outer loop that prompts the worker for you: a trigger, a check by code, specific feedback, and every way the loop stops."
+status: stable
+order: 323.16
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-20T12:19:24Z
+chapter: "23"
+part: III
+expert_status: builder-only
+concepts: [ "23.16" ]
+last_verified: 2026-11-05
+sources:
+  - id: osmani-loop-engineering
+    title: "Loop Engineering (Addy Osmani, accessed 2026-11-05)"
+    resource: https://addyosmani.com/blog/loop-engineering/
+generated:
+  at: 2026-11-20T12:19:24Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** A factory machine makes a part. An inspector measures it with a gauge, not by asking the machine whether it did well. A part that fails goes back to the machine with a note saying what was wrong, once or twice. After that it goes to a person's bench. The line starts when the shift bell rings and stops when the day's quota is made or the material runs out. Nobody stands beside the machine telling it what to do next. The line does that. In this concept, the machine is the session, the gauge is the check by code, and the line is the loop.
+
+**What you will learn.** How to design the system that starts the worker, checks what it returns with code, sends back what was wrong, and decides when to stop.
+
+**Why it matters.** A worker people pay for cannot wait for someone to type, and it cannot be trusted to say when it is done. The loop around it does both jobs.
+
+**One request, start to finish.** Nobody types a question for Brightline's morning triage. The loop asks for it.
+
+1. **The trigger fires.** At 7:10 on a weekday, New York time, a scheduled run starts a session with a budget of $0.50.
+2. **The task says what done means.** The first message asks for today's triage report and ends: "Give every open invoice exactly one decision, and cite a policy line for each. End with the report as JSON."
+3. **The worker runs its inner cycle.** It calls `list_open_invoices`, reads the result, calls `search_policy` for the rules it needs, and writes the report. The platform runs this part.
+4. **The session goes quiet, and the portal checks the report.** It does not ask the model whether it is done. Its own code compares the report with the tool results the platform recorded in that session: 16 open invoices came back, and the report decides 15. INV-8301 is missing.
+5. **The portal sends the failure back,** as a new message in the same session: "INV-8301 has no decision. Add one, with its policy line." The session still has its history, so the worker fixes only that invoice.
+6. **The second check passes.** The portal posts the report, records that today's run is done, and stops. If the check had still failed after a second correction, the portal would have sent the report to the AP expert marked "needs review", not posted it as finished.
+
+The run cost $0.31. Nobody prompted the worker, and nobody had to read its answer to know whether it was complete.
+
+### What is loop engineering?
+
+**Loop engineering** is designing the system that prompts the worker for you. In an essay in June 2026, the engineer Addy Osmani called the practice loop engineering: "replacing yourself as the person who prompts the agent".[^osmani-loop-engineering] A good prompt fixes one turn. A loop decides what the worker does next, what counts as done, and when to stop spending.
+
+There are two loops, one inside the other. The inner cycle is the agent itself, the loop you followed in [Chapter 21](../agent-loop-by-hand/what-an-agent-is-in-code.md): the model reads, asks for a tool, reads the result and goes on until it can answer ([23.1](the-worker-leaves-the-laptop.md)). On a hosted platform, the platform runs it, and you only read its events. The **outer loop** is yours. It decides when a run starts, checks what came back, sends the worker back with what was wrong, and stops. An AI Worker that people pay for is an outer loop. Without one, the worker waits for someone to type.
+
+Every outer loop has six parts. A hosted platform gives you a tool for most of them, but the design is still yours:
+
+| Part | The question it answers | What the platform offers | What you design |
+| --- | --- | --- | --- |
+| Trigger | What starts a run? | Scheduled runs, an API call from your product, webhooks out | Which events start work, and one run per piece of work, never two ([23.15](schedules-and-webhooks.md)) |
+| Task and "done" | What is the goal, and how will we know it is met? | The first message, or a rubric, a written list of what done means ([23.17](patterns-and-when-to-host-it-yourself.md)) | A definition of done that code can check |
+| Inner cycle | How does the worker do one attempt? | The whole cycle, in a session | Nothing to code. Read the events ([23.3](reading-a-session.md)) |
+| Check | Did it work? | A grader: another model that checks the work (23.17) | A check by code, not by the model's own "I think I'm done" (below) |
+| Feedback and stop | Try again, or stop? | Budgets, round limits, approval stops ([23.8](permission-policies.md), [23.5](a-budget-on-every-run.md)) | What is sent back, how many rounds, and where a failure goes (below) |
+| State | What happened last time? | The session's history, for one session only | Your own record of runs and results (below) |
+
+### How does Chapter 22's acceptance check grow up?
+
+In [22.6](../agent-sdks/what-counts-as-done.md), a limit only stopped a run, and an acceptance check decided whether the answer could be handed over: a guardrail, or your own code after the run, that refused an answer with no cited policy line. The outer loop's check is the same idea with more to check, and on a hosted platform it stays your own code: the platform's own rule for done is the model's stop, and even its grader is a model (23.17).
+
+The weakest check is the model's own word. A worker that says "all invoices are covered" may be wrong, and it cannot see what it missed. A strong check is code that compares the result with something the model did not write:
+
+- **The session's own tool results.** The platform records every tool result in the session's events. The portal's check reads them and asks: does every invoice `list_open_invoices` returned have exactly one decision? Is every cited policy line one that `search_policy` actually returned in this session? The model can be wrong about what it read. The recorded results cannot.
+- **Numbers recomputed by code.** If the report gives a total, the check adds the amounts from the tool results itself and compares. A worker reasons about invoices, and tested code does the arithmetic.
+- **The shape of the answer.** The report must be valid JSON that matches a schema, so the check can read it at all.
+
+Some platforms can also run a grader, a second model that checks the work (23.17). A grader is still a model, so a check by code stays the gate. The weaker the check, the more a person must review.
+
+### What happens when a check fails, and when does the loop stop?
+
+When a check fails, send the worker the specific failure, not "try again". Send it as a new message in the same session, so the worker keeps what it already read and fixes only what is wrong. Then decide when the loop stops. A loop with no stop is a bill with no end. Every loop needs all of these:
+
+- **Success:** the check passes. Post the result and record it.
+- **A round limit:** at most two corrections, for example. Then the result goes to a person, marked "needs review", and is never posted as done.
+- **The budget:** one cap for the whole session, all rounds included (23.5). `budget_reached` is a stop, and it is recorded as a failed run.
+- **A person's approval:** a tool that asks (23.8) stops the loop until someone answers. A loop nobody watches must treat "waiting for a person" as a stop, not a pause to wait out.
+- **A broken sign-in:** when the platform cannot renew the person's token ([23.14](when-a-refresh-is-refused.md)), the loop stops and pauses its schedule until the person signs in again.
+
+### Where does the loop keep its state between runs?
+
+A session remembers one run. The loop must remember all of them: which run handled which day, which failed, what went to a person. That record lives in your product, not in the session's history and not in a memory store, a notebook some platforms keep for a worker. In this chapter it is the portal's `reports` table, keyed by schedule, company and date. Part V of the book replaces it with a governed record of the work.
+
+### When does a loop need more?
+
+This chapter's loops are one session each, so the portal's own tables are enough. A loop that spans several sessions or waits for days needs more, and "Beyond this chapter" says what.
+
+**At work.** In [Lab 23](lab.md), Task 18, Claude Code builds the morning triage's check: plain code that compares each report with the session's own tool results, tested against four recorded runs. Any failure goes back to the same session, at most twice, and a report that still fails is marked "needs review". It starts one run by hand first.
+
+**The operating rule:** design the loop, not only the prompt. Give it a trigger, a "done" that code can check, a check by code, specific feedback, a round limit and a budget.
+
+![Four boxes in a loop, read left to right. First, in gold, trigger: a schedule or an event. Second, the session: the inner cycle, run by the platform. Third, the check by code: the report against the recorded tool results. From the check, a green arrow up to pass: post and record. A red-orange arrow down to the fourth box, feedback: send the specific failure to the same session, and a red-orange arrow from feedback back to the session. Beside feedback, a dashed box: after 2 rounds, a person reviews. Bottom left, a dashed box: one budget covers every round. Below: nobody types the next prompt. The loop does, and code, not the model, decides when it is done.](img/chapter-22-loop.png)
+
+*Figure 23.22. The outer loop: a trigger, the session, a check by code, and feedback, inside one budget.*
+
+### 23.14 to 23.16 in one minute
+
+When the platform cannot renew a person's token, the portal tells the person to sign in again (23.14). Every schedule has a time zone, every webhook is checked and deduplicated, and a timer catches what never arrived (23.15). And a loop checks the worker's work with code, sends specific failures back, and stops at a limit (23.16).
+
+**Now do Lab 23, Sitting 4** on the lab page: Tasks 14 to 18 (about 2 hours 40 minutes). Then come back for Part E.
+
+[^osmani-loop-engineering]: Loop Engineering, Addy Osmani.
+
+

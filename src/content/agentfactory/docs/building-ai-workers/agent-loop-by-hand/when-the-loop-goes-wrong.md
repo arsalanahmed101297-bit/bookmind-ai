@@ -1,0 +1,86 @@
+# 21.9 When the loop goes wrong (/building-ai-workers/agent-loop-by-hand/when-the-loop-goes-wrong)
+
+---
+type: Document
+title: "21.9 When the loop goes wrong"
+description: "Sorting every failure by whose fault it is: fix your own, retry the service's with backoff, show the answer when the model declines, and record each request id."
+status: stable
+order: 321.09
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-20T11:28:25Z
+chapter: "21"
+part: III
+expert_status: builder-only
+concepts: [ "21.9" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-20T11:28:25Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**Where this fits.** This is Ana's question when step 1, the call, fails. Any call to the model can fail. This concept sorts failures by whose fault they are, so you know which to fix and which to try again.
+
+**In everyday life.** When a parcel does not arrive, the first question is whose fault it was. A wrong address is the sender's to fix, and sending it again changes nothing. A storm that closed the depot is no one's fault, and trying again tomorrow works. A parcel the recipient declined is not a failure at all. And every parcel has a tracking number, which is the first thing the courier asks for. In this concept, the wrong address is a request error, the storm is an overload, the parcel declined is the model declining, and the tracking number is the **request id**.
+
+**What you will learn.** How to sort a failed call by whose fault it is, and what to do for each kind: fix it, try again later, or show it.
+
+**Why it matters.** Sending your own mistake again only pays for the same failure twice, and the service's trouble often needs nothing but a short wait.
+
+**One request, start to finish.** A builder copies an old sample into the loop. It worked last year. Now:
+
+1. **The request goes out** with `temperature` set to 1. Temperature is a sampling setting (it shapes how the model picks each next word): it used to make answers more or less varied, and older samples often set it.
+2. **The response is an error,** status 400, type "invalid request", with a message naming `temperature`, and a request id.
+3. **The builder's code does not retry it,** because a 400 means the request itself is wrong. Sending it again would fail the same way, and cost a call each time.
+4. **The builder reads the message,** removes the setting, and the call works.
+5. **The builder writes down why:** the newest **API version** of the first API rejects `temperature`, `top_p` and `top_k`, even at their default values. The sample was written for an older version. An **API version** is a dated set of rules for the API, and the SDK sends it with every request ([21.13](versions-models-and-keys.md) says more). Two similar names matter here:
+
+| Name | What it does | Where |
+| --- | --- | --- |
+| **The SDK** | The provider's client library. It sends each request, receives the response, and retries a failed send. It never runs the loop | This chapter |
+| **An agent SDK** | A library that runs the whole loop for you | Chapter 22 |
+
+With the exact SDK versions the lab uses, you usually meet this one step earlier: the SDKs no longer have a `temperature` option, so the type check (the step that checks names and settings before code runs, Chapters [13](../programming-fundamentals/overview.md) and [14](../structuring-programs/overview.md)) stops it before anything is sent. The 400 comes from the API only for code that slips past the type check, such as an old untyped helper (an older piece of code that skips that check), or a request written out as JSON by hand. Task 9 sends it that way on purpose.
+
+### Whose fault is a failure?
+
+Every call can fail, and the first question is always the same: is it my fault, the service's, or no fault at all? Each failure comes back with a **status code**, an error type, a message, and a **request id**, a unique label for that one request, which the provider asks for when you report a problem.
+
+### Which three status codes should you remember?
+
+A 400 means fix your request. A 401 means check your key (your **API key**, the secret password your program sends with each request, 21.13). A 429 or a 500 and up means wait and try again, which the SDK already does for you. The table below is for looking up, not for learning by heart.
+
+| Kind | Status (first API's names) | Whose fault | What to do |
+| --- | --- | --- | --- |
+| **The request is wrong** | 400 invalid request, 404 not found, 413 too large | Yours: code, configuration or an edited conversation | Read the message, fix the request. Never retry unchanged |
+| **The key is wrong** | 401 authentication, 403 permission | Yours: the key, or what it may do | Check the key file and its workspace or project. Never retry unchanged |
+| **The account cannot pay** | 402 billing, or a 400 once usage reaches a spend limit you set | Yours to fix by hand | Add credit, or raise the spending limit |
+| **A slow or clashing request** | 408 request timeout (an SDK retry case, not one of the first API's named errors), 409 conflict | Usually no one's | Nothing by hand: the SDK retries these for you (below) |
+| **Too many requests** | 429 rate limit | No one's: a limit on how fast you may call | The SDK waits, then retries, with growing waits |
+| **The service is struggling** | 500 server, 504 timeout, 529 overloaded | The service's | The SDK retries, with growing waits, a few times |
+| **The model declined** | 200, stop reason `refusal` | No one's: it is an answer | Show it, or send the request to another model. Never retry it unchanged as an error ([21.3](one-turn-request-response-and-stop-reason.md)) |
+
+### What are retries and backoff?
+
+A retry is sending the same request again after a failure. **Backoff** is waiting longer before each retry: perhaps half a second, then one second, then two, with a little randomness so many clients do not all retry at once. Both SDKs do this for you, twice by default, for connection errors and for status codes 408, 409, 429 and 500 and above. So the loop itself does not retry. When an error reaches your loop, the SDK has already tried. The loop lets it through, unchanged, and the caller reads it. A test in the lab proves the loop passes a 400 straight through. (One more case, an error in the middle of a stream, waits for 21.11.)
+
+### Integration fault or model fault?
+
+A model fault is the model doing the wrong thing with a request that was right: calling the wrong tool, misreading a result, writing a wrong answer. An integration fault is your code sending the wrong thing: a missing tool result, an edited thinking block, a setting the API no longer accepts. Integration faults show up as errors with a 400. Model faults show up as normal responses with wrong content, and you find them in the conversation log and the trace ([21.10](reading-a-trace.md)), not in an error.
+
+![A decision tree. At the top: a call failed. First branch: did it come back with status 200 and stop reason declined? Yes: not an error, show it. No: what is the status? Status 400, 404 or 413: fix the request, never retry. Status 401 or 403: check the key. Status 402, or a 400 at a spend limit you set: add credit. Status 429, 500, 504 or 529: retry with backoff, which the SDK already did twice. A note below: every leaf, write down the request id.](img/chapter-20-error-tree.png)
+
+*Figure 21.15. From an error to its fix. Write down the request id every time.*
+
+**At work.** In [Lab 21](lab.md), Task 9, your coding agent runs `npm run break -- temperature`, then `forced-tool`, then `bad-key`. For each, you predict the status and whose fault it is, then read what came back: the status, the type, the message and the request id. You write each request id in `ports/ch20.md`.
+
+**The operating rule:** sort every failure by whose fault it is before you act. Retry only the service's faults, with backoff, fix your own, and record every request id.
+
+

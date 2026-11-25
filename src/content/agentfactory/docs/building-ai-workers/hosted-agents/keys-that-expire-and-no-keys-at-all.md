@@ -1,0 +1,84 @@
+# 23.13 Keys that expire, and no keys at all (/building-ai-workers/hosted-agents/keys-that-expire-and-no-keys-at-all)
+
+---
+type: Document
+title: "23.13 Keys that expire, and no keys at all"
+description: "Stored keys with an end date and a spending cap, and workload identity, where a program proves what it is and no key is stored."
+status: stable
+order: 323.13
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:39Z
+chapter: "23"
+part: III
+expert_status: builder-only
+concepts: [ "23.13" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:39Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**Part D. Safe to sell: keys, refresh, schedules and loops.** *Half 2, Milestone 2. Read this half before you sell a worker to a client. First 23.13 and Sitting 3b, which proves the isolation and deploys with no stored key. Then [23.14](when-a-refresh-is-refused.md) to [23.16](loops-check-feedback-and-stop.md) and Sitting 4.*
+
+**In everyday life.** An office gives its owner a permanent key, which works until the lock is changed. A delivery driver gets no key at all. Each morning he shows his company badge at reception and gets a visitor pass that stops working at 6 p.m. If he loses the pass, it is useless by evening. If the owner loses the key, someone must notice and change the lock. In this concept, the permanent key is a stored API key, and the visitor pass is a short-lived token from workload identity.
+
+**What you will learn.** The three ways a program can prove who it is to the platform, why a key that never ends is a risk, and how a program can avoid storing a key at all.
+
+**Why it matters.** A stored key that leaks keeps working for whoever holds it. Each key you give an end date, or remove altogether, is one less secret to lose.
+
+**One request, start to finish.** Two programs need to talk to the hosted platform. The deploy workflow in CI applies the agent files on every merge ([23.4](resources-as-code.md)). The portal's server starts sessions all day. The builder works out how each should prove who it is.
+
+1. **CI already has an identity.** Each run of a CI job can ask its own CI system for a short-lived signed token that says "this is the `agents.yml` workflow, in this repository, on the main branch".
+2. **CI sends that token to the platform** and gets back a platform token that lasts one hour. It applies the files, and the token expires.
+3. **No key is stored in CI at all.**
+4. **The portal's server has no such identity** on the host the lab uses for it. So it holds a stored key, kept as a secret on the server, limited to one workspace, with a spending limit, and set to expire after 90 days.
+
+Two programs, two answers, each the safest one available.
+
+### How can a program prove who it is?
+
+There are three ways for a program to prove who it is:
+
+- **A static key** is a long secret string, made once and stored by the program, like the API keys you made in [Lab 21](../agent-loop-by-hand/lab.md) ([21.13](../agent-loop-by-hand/versions-models-and-keys.md)). It works until someone deletes it, or until it expires. Because it lasts, it must be stored safely, changed on a schedule (key rotation), and given an end date where the platform allows one (key expiry). A leaked key without an end date works for the attacker until someone notices.
+- **A service account** is an identity for a program, not a person. Keys and tokens can belong to it, so they do not stop working when a person leaves, and its rights can be narrower than any person's.
+- Workload identity replaces the stored key altogether. It works in three steps, the same three as in the CI story above:
+  1. The program asks the system it runs on, such as a CI system, for a short-lived signed token that names the program.
+  2. It sends that token to the platform. The platform checks it against a rule set up in advance: "tokens for this repository's main branch may act as this service account".
+  3. The platform returns its own short-lived token. The program uses it, and it expires.
+
+  Nothing is stored. *For reference:* the system that issues the first token is an identity provider, the token is a JWT ([Chapter 18](../securing-connectors/overview.md)), which follows OpenID Connect, and swapping it uses the JWT bearer grant of RFC 7523.
+
+| | Static key | Workload identity |
+| --- | --- | --- |
+| What is stored | The key, until it is rotated or expires | Nothing. Tokens are issued on demand |
+| How long a leaked credential works | Until it expires or is deleted | Until the short-lived token expires: from one minute to a day, one hour by default on the lab's platform |
+| What it needs | A safe place to store it | A system the program runs on that issues tokens, and a rule on the platform |
+| Where the lab uses it | The portal's server, as a server secret, expiring in 90 days | CI, applying the agent files |
+
+### Why do CI and the portal differ?
+
+Workload identity needs an identity provider the platform trusts. CI has one. The portal's server, on the host the lab uses, has none that the platform's documents describe. So the portal uses the next safest thing: a key linked to a service account, that works in one workspace only, has a spending limit, expires on a date, and is rotated by a written step before it does. [F6](reference.md#f6-workload-identity-keys-and-the-portals-secrets) has that step.
+
+**At work.** In [Lab 23](lab.md), Task 13, Claude Code sets up workload identity for the CI workflow, with a rule that accepts only the main branch of this repository. It removes the platform key from the repository's secrets, opens a pull request, and shows the builder its checks passing with no key and no platform token. After the merge, the merge job plans and applies, and the platform's record of the token exchange names the service account, not a person.
+
+**The operating rule:** use workload identity wherever you can. Where a key remains, give it to a service account, one workspace, a spending cap and an end date.
+
+![Two halves split by a dotted line. Left, headed stored key, a box reads server's secrets, the key, with a red-orange arrow to a box labeled platform. Below them, a dashed box reads expires in 90 days, rotate before, and a leaked key works until it expires. Right, headed workload identity, a box labeled CI job has an arrow down to a box that reads its own system, signed token naming repo, branch, workflow. A red-orange arrow runs from it to a box, platform checks a rule, and a green arrow runs back to the CI job, labeled token, 1 hour. Below, a gold box: nothing stored, a leaked token works for an hour at most.](img/chapter-22-keys-and-exchange.png)
+
+*Figure 23.19. A stored key against an exchanged token. Where a program can prove what it is, store nothing.*
+
+### 23.13 in one minute
+
+A stored key works until someone changes it, so give the portal's key an owner, a cap and an end date. Where a system can prove who it is, as CI can, use a short-lived token instead, and store no key at all.
+
+**Now do Lab 23, Sitting 3b** on the lab page: Tasks 12, 12b and 13 (about 2 hours 15 minutes). Then come back for 23.14.
+
+

@@ -1,0 +1,88 @@
+# 21.13 Versions, models and keys (/building-ai-workers/agent-loop-by-hand/versions-models-and-keys)
+
+---
+type: Document
+title: "21.13 Versions, models and keys"
+description: "Pinning the API version, the SDK, the model, the prompt and the prices, and keeping one key per project with a spending limit."
+status: stable
+order: 321.13
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:35Z
+chapter: "21"
+part: III
+expert_status: builder-only
+concepts: [ "21.13" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:35Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**Where this fits.** This keeps the same loop working the same way next month. The loop depends on things that change over time: the API's rules, the model, your instructions and the prices. This concept shows how to pin each one, so nothing changes unless you choose it.
+
+**In everyday life.** A recipe card says "bake at 350°F for 40 minutes". It only works if everyone uses the same oven, the same flour and the same card. A bakery that writes down which oven, which flour brand and which version of the card made each batch can tell why one batch failed. In this concept, the oven is the **API version**, the flour is the pinned model, and the card is the versioned prompt.
+
+**What you will learn.** Which parts of a loop change over time, how to fix each one in place, and how to keep each secret key safe.
+
+**Why it matters.** An upgrade nobody chose can break a loop that worked yesterday. When each part changes only on purpose, a break has a cause you can find.
+
+**One request, start to finish.** In January, a builder updates the loop's packages to their newest versions. The next run fails:
+
+1. **The error says** `temperature` is not allowed. (Here the type check from [21.9](when-the-loop-goes-wrong.md) caught it first: the new SDK has no such option. Code that skips that check, such as an untyped helper, would have got the API's 400 instead.)
+2. **The builder looks at what changed.** The new SDK **major version** (a big release that may change how things work) sends a newer API version **header** (a header is a label sent with each request), and that API version removed `temperature`, `top_p` and `top_k`. An old helper in the code still set `temperature`.
+3. **The pinned versions explain it.** The lock file (`package-lock.json`, which records the exact version of every package installed) shows the SDK moved from one major version to the next, and the API version moved with it.
+4. **The builder removes the setting,** runs the recorded tests, then pins the new versions on purpose.
+
+The break was not random. Something the builder had not pinned, the API version, had moved with the SDK.
+
+### Which three things matter most?
+
+Pin the SDK version, because it sets the API version. Pin the model by its exact id. Keep your API key in a file git ignores, with a spending limit. The table below is for looking up.
+
+### What does a loop depend on that can change?
+
+A loop depends on five things that change over time. Pin each one, so a change happens when you choose it:
+
+| What | What changes | How to pin it |
+| --- | --- | --- |
+| **The API version** | The **API version** names which set of rules a request follows: which fields it accepts and what they mean. The first API names its versions by date and sends the version in a **header**, a labeled line of text sent with every web request | Let the SDK set it, and pin the SDK |
+| **The SDK** | An SDK (software development kit) is the provider's library for calling its API from your language. Its version has three numbers, such as 1.5.0. A change in the first, a **major version**, may break things: it can change the API version and remove options | Pin exact versions in `package.json` and `py/pyproject.toml`. Read the provider's list of changes (its changelog) before a major |
+| **The model** | Each model has an id. A newer model can behave differently with the same prompt | **Model pinning**: name the exact model id in one place, `src/loop/config.json`. Chapter 29 covers choosing |
+| **The prompt** | The instructions are part of the program | A file with a version in its name, `prompts/ap-worker.v1.md`, reviewed like code |
+| **The prices** | Providers change prices | Copy them, with the date, into `config.json` ([F5](field-guide-agent-loop-by-hand.md#f5-prices-usage-and-caching)) |
+
+### How do you keep API keys?
+
+One key per project. An API key is a secret that proves which account is asking and bills it. Keep each key in its own file that git ignores, read at startup and never printed or committed. A leaked key spends your money. Give each key's project or workspace a monthly spending limit, as Task 0 did.
+
+### Can you reach the same models another way?
+
+Both providers' models are also offered through the big cloud providers' own model services, with their own keys, regions (where in the world they run), prices and sometimes a different set of features. The loop is the same, and the client is set up differently. [21.14](how-todays-tools-realize-it.md) names the routes.
+
+### Which habits help any application built on a model API?
+
+Three habits for any application built on a model API.
+
+- **Design for every interface.** The same loop may serve a web page, a command line and a scheduled job. Keep the loop free of any one interface: it takes a question and returns an answer, a stop reason and a cost, as the lab's loop does.
+- **Keep content inside its boundaries.** Log requests and responses on your own computer, for testing. In a product, think before you log what a person asked, and never log a key or a sign-in token.
+- **Keep each conversation separate.** A conversation array belongs to one person's one task. Start a new array for a new task, and never mix two people's conversations in one (Chapter 23 makes this a rule).
+
+![Five cards in a row: API version, set by the SDK. SDK, exact versions in the package files. Model, in gold, one id in config.json. Prompt, a file with a version in its name. Prices, copied, with the date. Below the cards: change each one on purpose. Then a wide box: API key, one per project, in a file git ignores, with a monthly spending limit.](img/chapter-20-what-to-pin.png)
+
+*Figure 21.20. What to pin, and where. Change each one on purpose.*
+
+**At work.** In [Lab 21](lab.md), Task 13, before the pull request, your coding agent shows you every pin: the SDK versions in `package.json` and `py/pyproject.toml`, the API version header in a recorded test's request (a date, such as `2026-10-21`), the model ids and `checked_on` date in `config.json`, and the prompt's file name.
+
+**The operating rule:** pin the SDK, the model, the prompt and the prices, and let the pinned SDK set the API version. Keep one key per project, in a file git ignores, with a spending limit.
+
+**Part D in one minute.** Streaming shows text as it arrives and parses tool input at the end ([21.11](streaming.md)). Caching makes the repeated start of each request cheap ([21.12](tokens-caching-and-what-a-call-costs.md)). And everything a run depends on is pinned (21.13). Now do [Sitting 4](lab.md#sitting-4-the-rest-of-the-api-and-ship-it-about-1-hour-25-minutes).
+
+

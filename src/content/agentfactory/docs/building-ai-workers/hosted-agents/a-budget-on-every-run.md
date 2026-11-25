@@ -1,0 +1,90 @@
+# 23.5 A budget on every run (/building-ai-workers/hosted-agents/a-budget-on-every-run)
+
+---
+type: Document
+title: "23.5 A budget on every run"
+description: "A dollar cap on every session, checked between model calls, and what becomes of the loop's turn and time limits."
+status: stable
+order: 323.05
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-21T00:02:26Z
+chapter: "23"
+part: III
+expert_status: builder-only
+concepts: [ "23.5" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-21T00:02:26Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** A company gives an employee a taxi allowance of $50 for the day. The meter is checked only between rides, so the ride under way finishes even if it takes the total to $52. But the next taxi is refused. The employee calls the office, which either raises the allowance or says "come back". In this concept, the allowance is the budget, and each ride is a model call.
+
+**What you will learn.** How a hosted platform caps what one run may spend, what happens when a run reaches the cap, and what became of the loop's other two stops.
+
+**Why it matters.** Every run costs you money, and an injected instruction can keep a worker calling tools. A cap on every run bounds the cost, and lets you set a fee without guessing.
+
+**One request, start to finish.** Ana asks: "For every open invoice from Hocking Valley Pallets, check its PO and the vendor's notes." Hocking Valley has 400 open invoices in a test version of the data. The session's budget is $0.50.
+
+1. **The worker lists the invoices** and starts checking them one by one.
+2. **After about forty checks,** the list cost reaches $0.49.
+3. **The next model call starts,** and finishes at $0.51.
+4. **The platform stops the session** with "budget reached". The history and the sandbox are kept.
+5. **The portal tells Ana:** "This run reached its $0.50 limit after checking 41 of 400 invoices." She can raise the limit or end the run.
+
+### What is a budget?
+
+A budget is a hard cap, in dollars, on what one session may spend. It is Chapter 21's cost cap ([21.8](../agent-loop-by-hand/the-stops-you-add-yourself.md)), now kept by the platform, like the first SDK's budget cap ([22.6](../agent-sdks/what-counts-as-done.md)). The platform adds up the session's list cost: model tokens at their published price (the units of text a model reads and writes, [21.12](../agent-loop-by-hand/tokens-caching-and-what-a-call-costs.md), not sign-in tokens), plus some platforms' charges for searches and for the time a session spends running. List cost is the published price, which may differ from what your company has agreed to pay, so the cap is a limit, not an invoice.
+
+Five facts shape how to use it:
+
+- **It is checked between model calls.** The call under way finishes, so the total can land a little past the cap.
+- **At the cap, the session pauses, it does not end.** It keeps its history and sandbox, and accepts only events that settle work in progress: a confirmation, an interrupt, the result of a tool your product runs. A new question is rejected.
+- **Raising the cap resumes the work.** The new cap must be above what the session has already spent. Removing the cap entirely is usually allowed too, and usually cannot be undone, so the lab never does it.
+- **It is set when the session is made.** A session made without one cannot be given one later. So every session the portal starts goes through one file, whose functions all require a budget, and every scheduled run is a file with a budget. The configuration check fails any other place in the code that starts a session, and any schedule file without a budget.
+- **On a schedule, it applies per run.** A scheduled run's budget is copied onto each session it starts, so it bounds each run, not the month's total. The month's total is bounded by the workspace's spending limit.
+
+### Why is a budget also your business model?
+
+When a company pays you a fixed monthly fee, every run is your cost, not theirs. This is the difference from the parts you built before:
+
+| What you sell | Built in | Where the AI runs | Who pays for its reasoning | What the customer gets |
+| --- | --- | --- | --- | --- |
+| A skill or a plugin | 16 | In the customer's own AI app | The customer's plan | A method their AI follows |
+| A connector | 17 to 19 | In the customer's AI app, calling your server | The customer's plan | Access to your data or system, for each person who signs in |
+| **A hosted agent** | **23** | **On a platform you pay, behind your product** | **You** | **A task done: send a request, get a result** |
+| **An AI Worker** | **23** | **The same, inside your product, with a role** | **You** | **Work done for each person and company, within limits, on a schedule** |
+
+A cap on every session is what lets you set a fee without guessing.
+
+### Why is a cap a safety control, not only a cost control?
+
+A test tool that never succeeded, and always said "try again" (21.8), showed that a loop runs until something stops it: the model kept calling it. On a hosted worker, an injected instruction such as "check every invoice again" can do the same. The budget is the limit the platform keeps for you even when the model has been fooled. It bounds what a run spends, not what it does: what stops an effect is still the boundary, the policy for each tool ([23.8](permission-policies.md)).
+
+### What became of the turn limit and the time limit?
+
+In 21.8 and 22.6 your loop had up to three stops. A hosted session gives you one, its budget, and "budget" here means only that dollar cap, not all three stops as in 21.8. A run that keeps calling tools still reaches the cap, so the budget also bounds turns. Time is still yours, as it was on every SDK (21.6). Give each session a deadline in your product, and interrupt it when the deadline passes, including a session that has waited too long on "needs action" ([23.3](reading-a-session.md)). The outer loop's round limit ([23.16](loops-check-feedback-and-stop.md)) is the third stop.
+
+**At work.** In [Lab 23](lab.md), Task 4, Claude Code starts a session with a budget of one cent and a task that needs several tool calls, each followed by a model call. The builder predicts which event comes first after the cap. The log shows a usage line just over one cent, then "budget reached". Claude Code tries to send a new question and shows the rejection. Then it raises the cap to ten cents, and the session picks up where it stopped.
+
+**The operating rule:** put a budget on every session, set from the worker contract and checked by CI. Expect the last call to cross it, and bound the month with a workspace limit.
+
+![A step chart of one session's list cost, up the side, against time, along the bottom, one step per model call. A dashed red-orange line marks the cap, labeled cap $0.50. The cost climbs in seven steps. The last step starts below the cap and ends just above it, labeled the call under way finishes: $0.51. Then the line runs flat, labeled paused: history and sandbox kept, a new question rejected. At the top left, above the cap, two buttons: raise the cap, in gold, and end the run.](img/chapter-22-budget.png)
+
+*Figure 23.9. The cost rises call by call. The last call crosses the cap, then the session pauses.*
+
+### Part A in one minute
+
+A hosted agent runs the loop, the tools and the files on someone else's servers ([23.1](the-worker-leaves-the-laptop.md)). It is made of four resources: a definition, a runtime environment, sessions and events ([23.2](four-resources.md)). You read a session's events to know why it stopped: finished, needs a person, or budget reached (23.3). You keep the resources as files, applied with a plan, so every change is reviewed ([23.4](resources-as-code.md)). And every session carries a budget, checked between model calls (23.5).
+
+**Now go to the lab page.** Do **Lab 23: getting ready** and Task 0 (45 minutes, or about 1 hour 30 minutes if you skipped [Lab 19](../business-data-and-retrieval/lab.md)). Then do **Sitting 1**: Tasks 1 to 4 (about 1 hour 35 minutes). Then come back for Part B.
+
+

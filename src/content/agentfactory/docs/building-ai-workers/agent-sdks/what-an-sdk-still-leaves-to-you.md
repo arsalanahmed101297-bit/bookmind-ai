@@ -1,0 +1,93 @@
+# 22.9 What an SDK still leaves to you (/building-ai-workers/agent-sdks/what-an-sdk-still-leaves-to-you)
+
+---
+type: Document
+title: "22.9 What an SDK still leaves to you"
+description: "The runtime an SDK in your own process leaves you: the process, what it inherits, credentials, files and traces, cost and time, upgrades, and what counts as done."
+status: stable
+order: 322.09
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:36Z
+chapter: "22"
+part: III
+expert_status: builder-only
+concepts: [ "22.9" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:36Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** A washing machine washes by itself, but someone still plumbs it in, decides what goes in it, and notices when it leaks. In this concept, the washing machine is the SDK, and the house is the process, the computer and the credentials it runs with.
+
+**What you will learn.** What an SDK in your own process does not take over, and which decisions about the computer it runs on stay yours.
+
+**Why it matters.** A worker started on a developer's computer can pick up that computer's settings, tools and details, unless you decide what it gets.
+
+**One request, start to finish.** On the lab's first run of the first SDK, before the lab's options were added, Ana's question worked. Then the builder read what the harness had sent to the model:
+
+1. **The tool list held more than the worker's five tools.** It also listed tools for driving a web browser. They came from the computer's own setup for its coding agent, which the harness read because nothing told it not to.
+2. **The conversation held a note the worker never wrote,** with details of the person signed in on that computer. It came from the environment the program was started in.
+3. **The request carried settings the lab's code never sets,** such as today's date and a description of the computer.
+4. **The fix was three options and one habit.** Read no settings files. Use only the MCP servers you name. Pass the harness only the environment variables it needs. And read one request, or the SDK's record of it, before you trust a worker.
+
+A harness built for a developer's computer uses that computer's setup. A worker is not a developer.
+
+### What does an SDK leave to you?
+
+An SDK in your own process takes over the loop. It leaves you the **runtime**: the process, the computer it runs on, and everything that comes with them. The lab keeps this list in `docs/sdk-map.md`, and Chapter 23 hands it, item by item, to a hosted platform:
+
+| Still yours | Why | What the lab does |
+| --- | --- | --- |
+| A process, and for some SDKs a disk | The first SDK's subprocess ([22.3](one-run-start-to-finish.md)) needs a process that stays alive and a disk. So it cannot run in an **edge function**, a small piece of code a cloud service starts for one request and then throws away | Runs on your computer |
+| A container and a sandbox | A harness that can reach a shell should run where a mistake cannot reach your files ([22.4](tools-and-where-each-call-runs.md)) | Built-in tools off. In production, a container per worker (Chapter 23) |
+| What the process inherits | What it gets from the computer it runs on: a harness can read the computer's settings files, MCP servers and environment variables | For the first SDK: no settings, only named servers, a short list of variables |
+| Credentials | The key and the connector token live in your process | The builder's key and a test token, as in Chapter 21. Chapter 23 gives each person their own token, in a vault |
+| Where transcripts and traces live | Session files on disk for the first SDK, traces sent out by default for the second ([22.7](where-the-conversation-lives.md), [22.8](where-traces-go.md)) | Session files off, tracing off, and you know which folders to check |
+| Cost and time | One SDK has a budget cap, the other does not. Neither has a time limit ([22.6](what-counts-as-done.md)) | The budget cap where there is one, and your own time limit in both |
+| Upgrades | Many agent SDKs are **pre-1.0**: their version starts with 0, and a small change, such as 0.21 to 0.22, may break things. Some features are **beta**: still being tested, and free to change | Each package is **pinned**, fixed to one exact version. Upgrade on purpose, on a branch, with the offline tests, which need no model, network or key |
+| What counts as done | The SDK's rule is the model's stop, plus its limits (22.6) | Your guardrail or your own check: your answer check, as in [Chapter 19](../business-data-and-retrieval/answers-that-cite-or-abstain.md)) |
+
+### Does your language change what the worker inherits?
+
+One language difference matters for safety. On the first SDK, the option that lists the environment variables replaces the environment in TypeScript, but only adds to it in Python. So in Python the worker could still inherit everything. The lab trims the environment itself, in both languages: Task 5 shows the option, and in Python a small function, `isolate_environment()`, also trims the program's own environment first.
+
+![Your process drawn as a large box on your computer. Inside, the SDK runs the loop, with six tags around it: process and disk, sandbox, what it inherits, credentials, transcripts and traces, cost and time. Below them, one tag: what counts as done, always yours. Outside the box, a dashed box labeled a hosted runtime takes most of these off your hands, next chapter, with an arrow to it.](img/chapter-21-still-yours.png)
+
+*Figure 22.12. Your process, and what a hosted runtime would take off your hands.*
+
+### How do you judge another framework?
+
+Judge any agent framework the way this chapter judged two SDKs: map it to the loop, read its defaults, and list what it leaves to you.
+
+**At work.** [Lab 22](lab.md), Task 15: write what this still leaves to you, one line per row of the table above.
+
+**The operating rule:** an SDK runs the loop, not your runtime. Decide what the process inherits, where its files and traces go, what it may spend, and how it is upgraded, and write each decision down.
+
+### What is harness engineering?
+
+What you just did has a name: **harness engineering**. A harness is everything around the model: the loop, the tools, the permissions, the checks and the limits. Your Chapter 21 loop was a small harness you built. The first SDK is a harness someone else built, which you shaped mostly by switching things off. The second SDK is a kit for building one, which you shaped mostly by adding to it. Either way, the work of deciding what the harness allows is harness engineering, and it comes down to five verbs:
+
+| Verb | What it means | Where you did it in this chapter |
+| --- | --- | --- |
+| **Constrain** | Limit what the worker can do | The tool list, the permission setting, your rule, the limits, the trimmed environment (22.4 to 22.6, 22.9) |
+| **Inform** | Give it what it needs to know | Instructions and tool descriptions, and reading the notes a harness adds on its own (22.3, 22.9) |
+| **Verify** | Check its work | The answer check: a guardrail, or your own check after the run (22.6) |
+| **Correct** | Tell it what went wrong | The denial message your rule sends back as the tool's result ([22.5](who-may-run-a-tool.md)) |
+| **Escalate** | Hand a decision to a person | The approval that hands the call back, for a person or your code to decide (22.5) |
+
+Each rung of the ladder moves the harness machinery further from your code. The five decisions stay with you on every rung.
+
+**Part D in one minute.** An SDK in your own process takes the loop and leaves you the runtime (22.9). Chapter 23's hosted runtime takes over most of that list. What counts as done stays yours. Now do Sitting 4.
+
+**Now do Lab 22, Sitting 4** on the lab page: Tasks 14 and 15, and the optional Task 13 (about 40 minutes). It ends with your reviewed pull request. Then come back for the reference.
+
+

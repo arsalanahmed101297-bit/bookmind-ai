@@ -1,0 +1,78 @@
+# 23.10 A vault per person and company (/building-ai-workers/hosted-agents/a-vault-per-person-and-company)
+
+---
+type: Document
+title: "23.10 A vault per person and company"
+description: "Each person's own token in a vault per person and company, added to connector calls on the way out, and never seen by the model."
+status: stable
+order: 323.1
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:38Z
+chapter: "23"
+part: III
+expert_status: builder-only
+concepts: [ "23.10" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:38Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** A building's front desk keeps a lockbox of residents' spare keys. Each key hangs on a hook labeled with one resident and one unit. When a plumber comes for Unit 4B, the desk clerk walks the plumber to the door and opens it with 4B's key. The plumber never holds the key, never sees the others, and cannot copy it. In this concept, the lockbox is the vault, the key is the person's token, and the plumber is the worker.
+
+**What you will learn.** How each person's own token travels from sign-in to the connector without ever reaching the model, and where the platform keeps it in between.
+
+**Why it matters.** A token the model never sees is one an injected instruction cannot reveal. Keeping one per person and company means each call carries the right person's rights, and no one else's.
+
+**One request, start to finish.** Ana signs in to Brightline's portal for the first time.
+
+1. **The portal sends Ana to the sign-in server** ([Chapter 18](../securing-connectors/overview.md)). She signs in, chooses Brightline, and sees a consent screen: "Brightline AP portal wants to read vendors, invoices, purchase orders and policies for Brightline Wholesale Supply, and keep access when you are away." She approves.
+2. **The sign-in server returns tokens to the portal's server:** a short-lived access token and a refresh token, both for Ana and Brightline, and an ID token, a signed note that tells the portal who signed in. The portal asks for it with `openid`, which Chapter 18's apps never needed.
+3. **The portal's server stores both in a vault** made for Ana at Brightline, as one credential for the connector's address. It records the vault's id beside Ana and Brightline in its own table, in the portal's own database: the sign-in server's stores no business data (Chapter 18). Then it forgets the tokens. In this design the portal never keeps a token.
+4. **Ana asks a question.** The portal starts a session naming Ana's vault.
+5. **The worker calls `list_open_invoices`.** The call leaves the sandbox with no token on it. On its way out, the platform finds the vault's credential for that address and adds Ana's token to the call.
+6. **The connector checks the token:** Ana, Brightline, the right scope. It answers.
+
+The token went from the sign-in server to the portal to the vault to the connector. It never passed through the model or the sandbox.
+
+### What kind of client is the portal?
+
+First, the portal must be allowed to hold tokens at all. Chapter 18's coding agents were public clients: programs on a person's own computer that cannot keep a secret. Each one held only its own user's tokens, on that user's own computer. The portal is different: it gets tokens for many people, on one server, and the platform uses them while those people are away. So it registers as a **confidential client**: a program on a server that proves who it is with a client secret it keeps, and sends whenever it asks for tokens or refreshes them. A stolen refresh token is then useless without the portal's secret as well.
+
+### Where was the token until now?
+
+In Chapter 22 your process sent the connector a test token in a header, and no sign-in ran at all ([22.4](../agent-sdks/tools-and-where-each-call-runs.md)). The token sat in a file on your computer, and the model never saw it. 22.4 said to keep tool calls in your own process unless you have a reason. A hosted worker has the reason: many people, at any hour, with no laptop of yours running. What you give up is seeing the loop's run step in your own code. You see the call and its result as events instead ([23.3](reading-a-session.md)). A vault keeps one thing from Chapter 22: the model never sees the token. It replaces the rest: a real person's own token, kept by the platform, refreshed by it, and added to the request on the way out.
+
+### What is a vault?
+
+A vault is a store, kept by the hosted platform, for one person's credentials. Each credential in it is a secret for one connector address, such as an access token, a refresh token and the details needed to refresh it. Three properties make it safe:
+
+- **Injected at egress.** The worker's calls leave the sandbox with no token. The platform adds the matching credential on the way out, so the model and the sandbox never see it. A planted instruction (23.7) cannot reveal a token the worker never had.
+- **Write-only secrets.** Your product can put a token in, replace it or remove it, but no one can read it back out, not even your own product.
+- **Refreshed by the platform.** When the access token expires, the platform uses the refresh token to get a new one, without the person. With **rotation**, each refresh also returns a new refresh token, and the old one stops working. (Later, [23.14](when-a-refresh-is-refused.md) covers what happens when that is refused.) To do that, each credential also carries the portal's client secret.
+
+### Why one vault per person and company?
+
+A vault holds one person's credentials, with at most one active credential for each connector address. When a person signs in again, the portal replaces the secret values in the existing credential rather than adding a second. If Luis worked for two companies, he would have two vaults, one per company, because each token carries one company in its `tenant` claim (Chapter 18). The portal's table maps each person and company to exactly one vault id. The session names the vault, and the definition names nothing.
+
+### What if no credential matches?
+
+If no credential matches the connector's address, the call goes out with no token, and the connector refuses it. That is the safe failure, and Lab Task 7 shows it on purpose.
+
+**At work.** In [Lab 23](lab.md), Task 10a, Ana signs in to the portal in a browser and approves consent. Claude Code shows the builder the new row in `agent_vaults`: Ana, `org_brightline`, a vault id, a credential id, `active`. It shows that the vault's credential cannot be read back. Then Ana asks "Which invoices are due this week?" and the builder reads the session's log. Claude Code searches the whole log for any part of Ana's token and finds none.
+
+**The operating rule:** keep each person's tokens in a vault for that person and company, chosen on your server. Let the platform add the token on the way out, so the model never sees it.
+
+![The token's path, never through the model. Across the top, four boxes joined by red-orange arrows read, left to right, Ana consents for Brightline, sign-in server issues tokens, portal's server writes the vault and keeps only its id, and, in gold, vault for Ana at Brightline. Below, a dashed red-orange area labeled the model and the sandbox holds a box: tool call, no token. An arrow runs from it, out of the area, to a gold box that reads sandbox wall, token added, which also gets a red-orange arrow down from the vault. A red-orange arrow then runs to a gold box: connector checks Ana, Brightline. Under the dashed area, in red-orange: the token never enters here.](img/chapter-22-token-path.png)
+
+*Figure 23.15. The token's path: sign-in server, portal, vault, connector. Never the model, never the sandbox.*
+
+

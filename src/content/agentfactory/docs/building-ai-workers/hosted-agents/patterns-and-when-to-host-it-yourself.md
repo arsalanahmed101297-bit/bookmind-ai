@@ -1,0 +1,89 @@
+# 23.17 Patterns, and when to host it yourself (/building-ai-workers/hosted-agents/patterns-and-when-to-host-it-yourself)
+
+---
+type: Document
+title: "23.17 Patterns, and when to host it yourself"
+description: "Patterns inside a session, the three places a worker can run, and when to run the loop yourself."
+status: stable
+order: 323.17
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:39Z
+chapter: "23"
+part: III
+expert_status: builder-only
+concepts: [ "23.17" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:39Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**Part E. Design.** *Two concepts for designing your own workers: which patterns to use, when to host the loop yourself, and the four disciplines. Then Sitting 5, the ports and shipping. Optional Task 21b builds on 23.17, and Task 21 fills in [23.18](designing-a-hosted-worker.md)'s table.*
+
+*Reference at the depth of a design decision. Each pattern gets one row here, and a paragraph with its Brightline use on the companion page. Chapter 27 goes deeper into splitting work across agents.*
+
+**In everyday life.** A growing accounting office first hires one bookkeeper. Later it adds juniors who each take a pile of invoices, a senior who reviews the trickiest ones, a checklist that says when a month is closed, and a filing cabinet of notes for next month. Each is a choice, and each costs something. And at some size, the office decides whether to keep renting desks or buy its own building.
+
+**What you will learn.** Which ways of splitting or extending one run are worth their cost, the three places a worker can run, and when to run the loop yourself.
+
+**Why it matters.** Every helper, advisor or extra round spends from the same budget, and every place to run trades control for work. Choosing without a reason buys cost, not quality.
+
+**One request, start to finish.** Brightline's controller asks for one thing at month end: "Tell me which open invoices are a problem, and why, with the policy line for each." The builder could leave it to one worker in one session. Or the worker could hand purchase orders to one helper and vendor notes to another, consult a stronger model before it writes the summary, and keep going until a grader agrees every invoice has a decision. Each step adds quality and cost, and every one spends from the same budget. The patterns below are the choices.
+
+### Which six patterns can a session use?
+
+Each one spends from the session's budget. The full description of each, with its Brightline use, is on the companion page.
+
+| Pattern | What it is | The one thing to remember |
+| --- | --- | --- |
+| **Several agents in one session** | The worker hands parts of a task to helper agents, each with its own instructions | They share the sandbox, the vaults and the budget, and on the lab's platform a helper cannot hand work on again |
+| **A workflow the agent writes** | A small program that runs many agents in phases, for large work with many similar pieces | Every agent in it spends from one budget, so the cap matters most here |
+| **An advisor** | A second, more capable model the worker consults at key moments | Billed at its own model's price, from the same budget |
+| **An outcome** | A goal and a rubric, checked by a separate grader that sends the work back for more rounds | The grader is a model, so a check by code stays the gate ([23.16](loops-check-feedback-and-stop.md)) |
+| **A memory store** | Notes a worker saves and reads in later sessions | Shared data, so one store per person and company ([23.11](one-session-one-person-one-company.md)) |
+| **Large outputs saved to a file** | A tool result too big for the model goes to a file in the sandbox | The model reads only the parts it needs ([23.6](what-travels.md)) |
+
+### Where can a worker run?
+
+[Chapter 22](../agent-sdks/from-your-loop-to-a-library.md)'s ladder (Figure 23.1) had four rungs: your own loop, a tool runner (a small helper that runs the loop), an agent SDK, and a hosted runtime on top. Seen up close, there are three places a worker can run, each giving you more control and more work. The first two are forms of that top rung. The third is the three rungs below it:
+
+| | Hosted runtime | Hosted loop, your own sandbox | Your own runtime |
+| --- | --- | --- | --- |
+| Who runs the loop | The platform | The platform | Your program (Chapters [21](../agent-loop-by-hand/what-an-agent-is-in-code.md) and 21) |
+| Where tools and files run | The platform's sandbox | A computer you control | A computer you control |
+| Who holds each person's tokens | The platform's vaults | The platform's vaults, for connector calls | You |
+| Fits when | You want the least to run | Files or tools must stay on your network | Data must never leave your systems, or you need control of every step |
+| What you can test | Your product's choices, and the platform's logs | Also your sandbox | Everything, including the loop |
+
+### When do you need your own runtime?
+
+The third place is where Chapters 21 and 22 left you: the loop runs in your own program, as plain code you can read or run by an agent SDK. Most workers you sell will run on a hosted platform. You need your own runtime when:
+
+- **The data or the tools must stay where a hosted platform cannot run,** or under data rules the platform does not offer.
+- **You need control between model calls** that a permission policy cannot express, such as your own check before every tool call.
+- **You need a model or a runtime the platform does not offer,** such as an open model on your own servers.
+- **The cost or speed of many runs** favors running the loop yourself.
+
+[22.9](../agent-sdks/what-an-sdk-still-leaves-to-you.md)'s list of what an SDK still leaves to you is the trade this table shows. A hosted runtime takes over most of it ([23.1](the-worker-leaves-the-laptop.md)). Your own runtime keeps all of it. What counts as done stays yours in all three places (23.16).
+
+### What should you not build on yet?
+
+Some features are in a research preview inside the platform's beta, offered on request only, and are not on the exam (23.19): private connectors reached through a tunnel from inside your own network, and a "dreaming" feature that reviews past sessions in the background. Do not build a lab or a product on them yet.
+
+**At work.** In [Lab 23](lab.md), optional Task 21b, Claude Code gives a Cedar Ridge session an outcome with a four-line rubric written by the builder as Luis, at most three rounds and a budget of $1.00. The builder reads the grader's explanation after each round.
+
+**The operating rule:** add a pattern only when the task needs it, and keep every one within the session's budget. Choose where the worker runs by where your data and tools must run.
+
+![Above, six boxes in a row: helpers, a workflow, an advisor, an outcome and grader, a memory store, and large outputs to a file. One red-orange line under them reads each spends from the same budget. Below, three boxes rising left to right like steps, joined by red-orange arrows. First, in gold: hosted runtime, the platform runs the loop, the sandbox and the vaults, least to run. Second: hosted loop, your own sandbox, files stay on your network. Third and tallest: your own runtime, you run everything, most control, most work.](img/chapter-22-runtime-ladder.png)
+
+*Figure 23.23. Patterns inside a session, and the three places a worker can run, rising with how much you run yourself.*
+
+

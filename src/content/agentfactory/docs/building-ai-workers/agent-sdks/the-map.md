@@ -1,0 +1,86 @@
+# 22.2 The map (/building-ai-workers/agent-sdks/the-map)
+
+---
+type: Document
+title: "22.2 The map"
+description: "The mapping table: every line of your Chapter 21 loop, and where each SDK does it, does it differently, or leaves it to you."
+status: stable
+order: 322.02
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:36Z
+chapter: "22"
+part: III
+expert_status: builder-only
+concepts: [ "22.2" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:36Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** Before a company moves its payroll from a spreadsheet to a payroll service, the finance lead lists every column of the old spreadsheet. For each one, she writes where the new service does it, or "still ours". In this concept, the columns are the lines of your loop, and her list is the mapping table.
+
+**What you will learn.** How to list every line of your Chapter 21 loop, and record for each line where each SDK now does that work.
+
+**Why it matters.** A line you never wrote down is work you may think an SDK does for you when it does not.
+
+**One request, start to finish.** Before reading either SDK, list what your Chapter 21 loop did for Ana's question: its five steps, the tools it allowed, the three limits it checked before every call, the deadline on each call, the retries, where it kept the conversation, and the trace. Each of those is a row in the table below.
+
+Here is the whole loop in six lines of plain words, with where each line goes once an SDK takes over. The table below is this, one row per line.
+
+```text
+1  send the instructions, history and tools    -> both SDKs do it for you
+2  keep the reply                              -> both SDKs do it for you
+3  if the model wants no tool, stop            -> both SDKs do it for you
+4  run each tool the model asked for           -> both SDKs do it for you
+5  add each result, then go back to line 1     -> both SDKs do it for you
+*  before each call: check turns, cost, time   -> turns: an option on both
+                                                  cost: an option on the first SDK only
+                                                  time: still yours on both
+```
+
+### What is the mapping table?
+
+The mapping table is the spine of this chapter. It has the Chapter 21 column filled and the two SDK columns empty. You fill them in during the lab, in `docs/sdk-map.md`. The finished table is on the companion page.
+
+| The line of your Chapter 21 loop | What it did | The first SDK | The second SDK |
+| --- | --- | --- | --- |
+| Step 1. Call | Instructions, the whole conversation, the tools, sent every time | | |
+| Step 2. Keep | Add the model's reply, unchanged | | |
+| Step 3. Check | Loop only while the model wants a tool | | |
+| Step 4. Run | Call each tool through the connector, catch every failure | | |
+| Step 5. Return | One result per call, matched by id | | |
+| Which tools may run | Only tools on your allow-list, `allowOnly()` (21.8). Each of those ran when asked | | |
+| Turn limit | Checked before every call (8) | | |
+| Cost cap | Worked out from usage and prices (10 cents) | | |
+| Time limit | Checked before every call (2 minutes) | | |
+| Request deadline | 60 seconds per attempt, set on the client (21.8) | | |
+| Retries | Two, by the client library, with backoff | | |
+| Where the conversation lives | An array in your program | | |
+| The trace | A span per model call and per tool call, on your computer | | |
+
+Backoff means waiting a little longer before each new try.
+
+Three kinds of answer go in the SDK columns. **It does it**, with the option that controls it. **It does it differently**, with the difference written down. And **still yours**, when the SDK has no option and your code must keep doing it.
+
+![The Chapter 21 loop drawn as its five steps in a circle, joined by arrows: call, keep, check, run, return. Each step is tagged the SDK runs it. Beside the circle, three stops: turn limit, an option on both, cost cap, an option on the first only, and time limit, still yours on both. A box beside them reads you choose and enforce: which tools, whose credentials, what it may spend, what counts as done.](img/chapter-21-the-map.png)
+
+*Figure 22.2. Every line of your loop, labeled with who does it now.*
+
+**At work.** [Lab 22](lab.md), Task 2: read the worker's spec and start your table. Each later task fills in a cell or two.
+
+**The operating rule:** map every line of the loop you know to where the new library does it, before you trust the library. Write "still yours" wherever it has no answer.
+
+**Part A in one minute.** There are four rungs: your loop, a tool runner, an agent SDK and a hosted runtime. Each does more for you and shows you less, and each chooses some things for you ([22.1](from-your-loop-to-a-library.md)). The mapping table lists every line of your Chapter 21 loop, and you fill in where each SDK does it, how it differs, or that it is still yours (22.2). Now set up the lab and do Sitting 1.
+
+**Now go to the lab page.** Do **Lab 22: getting ready** and Task 0 (about 20 minutes). Next comes Sitting 1, with Task 2 and the optional Task 1 (about 15 minutes, 45 with Task 1). Then come back for Part B.
+
+

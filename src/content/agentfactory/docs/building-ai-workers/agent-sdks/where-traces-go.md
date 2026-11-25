@@ -1,0 +1,79 @@
+# 22.8 Where traces go (/building-ai-workers/agent-sdks/where-traces-go)
+
+---
+type: Document
+title: "22.8 Where traces go"
+description: "Where an SDK sends its traces by default, what they hold, and five checks before you turn tracing on for real data."
+status: stable
+order: 322.08
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-15T11:19:36Z
+chapter: "22"
+part: III
+expert_status: builder-only
+concepts: [ "22.8" ]
+last_verified: 2026-11-05
+generated:
+  at: 2026-11-15T11:19:36Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** A clinic's quality office logs every visit, so the clinic can learn what went wrong. But if an outside company runs the quality office and keeps the logs in its own building, every visit's details are now in that building too, unless someone said no. In this concept, the visit log is a trace, and the outside building is the provider's dashboard.
+
+**What you will learn.** Where an SDK sends the record of each run by default, what that record holds, and what to check before you let it leave your computer.
+
+**Why it matters.** A record of a run can hold questions, invoice numbers and answers. Sending it out is a decision to share business data.
+
+**One request, start to finish.** Ana's question runs once on each SDK:
+
+1. **On the second SDK, tracing is on by default.** As the run goes, it sends the trace to the provider's dashboard, in batches every few seconds, and once more when the program ends. The trace can hold the question, the tool's arguments and results, and the answer.
+2. **The same, with the model on your own computer.** The model calls stay at home. The trace still goes to the provider, because the SDK's default trace address does not change when the model's address does.
+3. **On the first SDK, tracing is off unless you set it up.** The lab's hook writes your own log line for every tool call instead. The lab's worker also asks the harness to send no nonessential traffic of its own, such as update checks and error reports.
+
+### Where does an SDK send its traces?
+
+Tracing is the SDK writing a trace of each run, with a span for each step, as in Chapter 21.10. A **trace processor** is the part that sends each trace somewhere. **OpenTelemetry** is an open standard for traces, so many tools can read them. Three questions decide where your traces go:
+
+- **Is it on by default?** On the second SDK, yes. On the first, no.
+- **Where does it send them?** To the provider's dashboard, to your own store through a processor you choose, or to an OpenTelemetry **collector** you run (a small program that receives traces and passes them on to the store you choose).
+- **What is in them?** Steps and timings always. Often the questions, the tool results and the answers too: invoice numbers, amounts, a person's words.
+
+A trace that leaves your process is data leaving your process. Treat turning tracing on like any other decision to share data. Some companies have a **zero-data-retention agreement**, a contract that the provider keeps none of their data. Under such an agreement, the second SDK's tracing to OpenAI cannot be used at all.
+
+### What should you check before tracing real data?
+
+Before you turn tracing on for real data, check five things.
+
+1. **Where it goes:** the address in the SDK's code or documentation.
+2. **What is in a span:** read one trace of a test question.
+3. **What is kept out:** no key or token in any span.
+4. **Who may see it, and for how long:** agreed with the business that owns the data.
+5. **How to turn it off:** one setting, tested.
+
+![Your process drawn as a box on the left, with a run inside it and spans coming out. Three arrows leave it. One, solid and labeled on by default for one SDK, to a dark box labeled the provider's dashboard, with a note: even when the model runs on your own computer. Two, dashed, to a box labeled your own store, through a processor you choose. Three, dashed, to a box labeled an OpenTelemetry collector you run. A switch drawn on the first arrow, set to off, labeled the lab's default.](img/chapter-21-traces.png)
+
+*Figure 22.11. Where traces go. One SDK sends them out by default.*
+
+**At work.** [Lab 22](lab.md), the optional Task 12: tracing on once, with test data. On the core path, go through the five checks on paper.
+
+**The operating rule:** decide where traces go before the first run. Turn the default off until you have agreed what may leave, and send spans to a store you control when you can.
+
+**Part C in one minute.** A limit only stops a run. An acceptance check, such as a guardrail, says whether its answer may be handed over. Set every limit yourself, and know which ones the SDK keeps ([22.6](what-counts-as-done.md)). A conversation lives in your program, a file on your side, the provider's side, or nowhere after the run. Choose one, and know what is left after a restart ([22.7](where-the-conversation-lives.md)). Traces may leave your process by default, even when the model does not, so check five things before you turn them on (22.8). Now do Sitting 3.
+
+**Now do Lab 22, Sitting 3** on the lab page: Tasks 9 to 11, about 1 hour 15 minutes, and the optional Task 12 (20 minutes more). Then come back for Part D.
+
+**Checkpoint 3: was the run safe and successful.** Before Part D, check that you can do these without looking back.
+
+- Say what counts as done on each SDK, what a guardrail adds, and which limits stay yours (22.6).
+- Name the places a conversation can live, the lab's choice on each SDK, and what a session file holds (22.7).
+- Say where traces go by default, and why pointing the model at your own computer does not keep them home (22.8).
+
+

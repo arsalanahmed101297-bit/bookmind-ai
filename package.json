@@ -1,0 +1,41 @@
+{
+  "name": "bookmind-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "import:course": "node scripts/import-agentfactory.mjs",
+    "qa:official": "node scripts/qa-official.mjs",
+    "qa:rls": "node scripts/test-rls.mjs && node scripts/test-rls-learning.mjs",
+    "qa:routes": "node scripts/qa-routes.mjs",
+    "qa:visual": "node scripts/visual-qa.mjs",
+    "qa": "npm run qa:rls && npm run qa:routes && npm run qa:visual && npm run qa:official"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.79.0",
+    "marked": "^18.3.0",
+    "next": "16.4.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.7.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.6.0",
+    "@tailwindcss/turbopack": "4.3.3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "playwright": "^1.65.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "^5"
+  }
+}

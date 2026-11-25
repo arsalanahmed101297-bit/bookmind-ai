@@ -1,0 +1,87 @@
+# 18.4 Two guards for the code (/building-ai-workers/securing-connectors/two-guards-for-the-code)
+
+---
+type: Document
+title: "18.4 Two guards for the code"
+description: "PKCE makes a stolen code useless, and the issuer check stops the app handing a code to the wrong sign-in server."
+status: stable
+order: 318.04
+ksor:
+  owner: team:panaversity
+  audience: [ public ]
+  approval:
+    by: process:panaversity
+    at: 2026-11-02T18:20:57Z
+chapter: "18"
+part: III
+expert_status: builder-only
+concepts: [ "18.4" ]
+objectives:
+  - { id: CCDV-F.D7.S4, label: supporting }
+  - { id: CCDV-F.D8.S2, label: supporting }
+last_verified: 2026-11-02
+sources:
+  - id: mcp-authorization
+    title: "Authorization, MCP specification 2026-07-28 (MCP, accessed 2026-11-02)"
+    resource: https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
+  - id: rfc7636
+    title: "RFC 7636, Proof Key for Code Exchange (IETF, accessed 2026-11-02)"
+    resource: https://www.rfc-editor.org/rfc/rfc7636
+  - id: rfc9207
+    title: "RFC 9207, OAuth 2.0 Authorization Server Issuer Identification (IETF, accessed 2026-11-02)"
+    resource: https://www.rfc-editor.org/rfc/rfc9207
+generated:
+  at: 2026-11-02T18:20:57Z
+  by: process:panaversity
+trust_tier: unverified
+build_id: sha256:2cd6f7990b973aac2ccc6b57c326777d36e2c68032baeb1bfa1cbf50cd487c4a
+dirty: true
+ksor_version: 0.0.60
+---
+
+**In everyday life.** At a coat check, the attendant hangs your coat with one half of a torn ticket and gives you the other half. A stranger who reads the number off the hook still cannot collect your coat without your half. In sign-in, the one-time code is the number anyone might see, and a secret the app keeps is your half.
+
+**What you will learn.** The two checks that protect the one-time code, and what each one stops.
+
+**Why it matters.** The code travels through the browser, where other programs can see it. These two checks are why that is safe.
+
+**One request, start to finish.** In step 6 of [18.2](sign-in-in-one-picture.md), the one-time code passed through Ana's browser. Suppose Ana installed a harmful browser add-on that can see every address her browser visits. It cannot see inside her AI app. It copies the code from the address.
+
+1. **The add-on races to swap the code for tokens** at the sign-in server, before Ana's app does.
+2. **The sign-in server asks for the matching secret,** the other half of the ticket. The add-on does not have it.
+3. **The swap is refused.** Ana's app, which has the secret, swaps the code a moment later and gets its tokens.
+
+### What protects the code?
+
+Two checks protect the code:
+
+- **PKCE** (Proof Key for Code Exchange, said "pixie") is the torn ticket. Before step 3 of [18.2](sign-in-in-one-picture.md), the app makes a random secret and keeps it. It sends the sign-in server only a scrambled form of it, made with the same kind of one-way scramble as a password hash ([18.1](who-is-calling.md)). In step 7, when it swaps the code, it sends the secret itself. The sign-in server scrambles the secret, checks it matches, and only then hands over tokens. A thief with the code but not the secret gets nothing. OAuth 2.1 requires PKCE, and an MCP app **must** refuse to sign in at a sign-in server that does not say it supports it.[^mcp-authorization]
+- **The issuer check** is a name tag: the code comes back labeled with the sign-in server that made it, and the app sends it only there. That name is the sign-in server's issuer. Before swapping the code, the app checks that this is the sign-in server it sent Ana to.
+
+### Why does the issuer check matter?
+
+1. Ana clicks connect on both connectors in the same minute: Brightline's, and a free one from a marketplace whose sign-in server is hostile. Her app now has two sign-ins open, and while they are open it waits for both with one listener, at one port.
+2. Both sign-in servers send her browser back to that same listener. One code arrives. It was made by Brightline's sign-in server, and a bare code carries no name.
+3. Without a name on the code, the app cannot tell which sign-in it belongs to. Suppose it guesses wrong, and thinks the code came from the hostile sign-in server:
+   - It sends the code from Brightline's sign-in server to the hostile sign-in server, together with its secret, because swapping a code always means sending the code and the secret together.
+   - The hostile sign-in server now holds both halves of the ticket, and swaps them at Brightline's sign-in server itself. PKCE cannot help, because the app handed over the secret.
+
+The issuer check removes the guess: the code arrives with the name of the sign-in server that made it, and the app sends it only there. Security people call this a mix-up attack.
+
+**In short:** PKCE stops a thief who has only the code. The issuer check stops your own app from handing both halves to the wrong server.
+
+**At work.** The builder reads the sign-in server's document from [18.3](finding-the-door.md) with Claude Code and finds the two lines that matter here: it says it supports PKCE, and it says it always sends its name with the code.
+
+**The operating rule:** every sign-in uses PKCE, and the app checks the sign-in server's name before it swaps a code. A sign-in server that cannot do both is not one to trust with your people.
+
+*The standards behind this concept: PKCE (RFC 7636)[^rfc7636] and the issuer check (RFC 9207).[^rfc9207] Field guide [F4](field-guide-securing-connectors.md#f4-the-sign-in-in-detail) shows where each appears in the messages.*
+
+![Two rows. Top row, PKCE as a torn ticket: the app keeps one half, a secret, and sends the sign-in server a scrambled form. A thief copies the one-time code from the browser and tries to swap it, without the secret, and is refused. The app swaps the code with the secret and gets tokens. Bottom row, the issuer check: the code returns with the sign-in server's name. The app compares it with the sign-in server it sent the person to. A matching name continues. A different name, from a hostile sign-in server, stops.](img/chapter-18-two-guards.png)
+
+*Figure 18.7. PKCE makes a stolen code useless. The issuer check makes sure the code goes back to the right sign-in server.*
+
+[^mcp-authorization]: Authorization, MCP specification 2026-07-28, MCP.
+[^rfc7636]: RFC 7636, Proof Key for Code Exchange, IETF.
+[^rfc9207]: RFC 9207, OAuth 2.0 Authorization Server Issuer Identification, IETF.
+
+
